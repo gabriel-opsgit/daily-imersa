@@ -1,0 +1,28 @@
+name: Lembrete Daily
+
+on:
+  schedule:
+    - cron: "0 20 * * 1-5"  # 17h00 horário de Brasília (UTC-3), seg a sex
+  workflow_dispatch:          # permite disparar manualmente também
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install gspread google-auth
+
+      - name: Enviar lembretes
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          GMAIL_USER:               ${{ secrets.GMAIL_USER }}
+          GMAIL_PASSWORD:           ${{ secrets.GMAIL_PASSWORD }}
+          SHEET_NAME:               ${{ secrets.SHEET_NAME }}
+          APP_URL:                  ${{ secrets.APP_URL }}
+        run: python scripts/send_reminder.py
