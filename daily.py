@@ -6,6 +6,13 @@ from datetime import datetime, date, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 
 ADMIN_PASSWORD = "Imersa-daily"
 SCOPES = [
@@ -113,6 +120,63 @@ def send_reminder_emails(emails_missing: list, app_url: str):
         except Exception as e:
             erros.append(f"{email}: {e}")
     return erros
+
+# ─── PDF ───────────────────────────────────────────────────────────────────────
+
+def generate_daily_pdf(df: pd.DataFrame, data_str: str) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    base = getSampleStyleSheet()
+    title_style = ParagraphStyle("title", parent=base["Heading1"],
+                                 fontSize=20, textColor=colors.HexColor("#1a1a2e"),
+                                 alignment=TA_CENTER, spaceAfter=4)
+    sub_style   = ParagraphStyle("sub", parent=base["Normal"],
+                                 fontSize=11, textColor=colors.HexColor("#555555"),
+                                 alignment=TA_CENTER, spaceAfter=16)
+    name_style  = ParagraphStyle("name", parent=base["Heading2"],
+                                 fontSize=14, textColor=colors.HexColor("#1a1a2e"),
+                                 spaceBefore=8, spaceAfter=2)
+    role_style  = ParagraphStyle("role", parent=base["Normal"],
+                                 fontSize=10, textColor=colors.HexColor("#888888"),
+                                 spaceAfter=8)
+    label_style = ParagraphStyle("label", parent=base["Normal"],
+                                 fontSize=9, textColor=colors.HexColor("#666666"),
+                                 fontName="Helvetica-Bold", spaceAfter=2,
+                                 spaceBefore=6)
+    value_style = ParagraphStyle("value", parent=base["Normal"],
+                                 fontSize=11, textColor=colors.HexColor("#222222"),
+                                 spaceAfter=4, leading=15)
+
+    story = []
+    story.append(Paragraph("📋 Relatório Daily Imersa", title_style))
+    story.append(Paragraph(f"Data: {data_str}", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1,
+                            color=colors.HexColor("#dddddd"), spaceAfter=16))
+
+    for _, row in df.iterrows():
+        story.append(Paragraph(f"👤 {row['nome']}", name_style))
+        story.append(Paragraph(f"{row.get('funcao','') or ''} · {row.get('timestamp','') or ''}", role_style))
+
+        for label, field in [
+            ("✅ O que fez hoje", "feito_hoje"),
+            ("📅 Para amanhã",   "amanha"),
+            ("🚧 Bloqueios",     "bloqueios"),
+            ("⚠️ Dificuldades",  "dificuldades"),
+        ]:
+            valor = str(row.get(field, "") or "").strip() or "—"
+            story.append(Paragraph(label, label_style))
+            story.append(Paragraph(valor.replace("\n", "<br/>"), value_style))
+
+        story.append(HRFlowable(width="100%", thickness=0.5,
+                                color=colors.HexColor("#eeeeee"),
+                                spaceBefore=12, spaceAfter=4))
+
+    doc.build(story)
+    return buf.getvalue()
+
 
 # ─── ESTILOS ───────────────────────────────────────────────────────────────────
 
@@ -261,7 +325,7 @@ def page_admin():
 
     # ── TAB 1: Daily do dia ────────────────────────────────────────────────────
     with tab1:
-        col_date, col_btn = st.columns([2, 1])
+        col_date, col_btn, col_pdf = st.columns([2, 1, 1])
         with col_date:
             sel_date = st.date_input("Data", value=date.today(), key="sel_date")
         sel_str = sel_date.strftime("%d/%m/%Y")
@@ -273,6 +337,22 @@ def page_admin():
         all_members = df_members["nome"].tolist() if not df_members.empty else []
         filled      = df_today["nome"].tolist() if not df_today.empty else []
         missing     = [m for m in all_members if m not in filled]
+
+        with col_pdf:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📄 Gerar PDF", use_container_width=True, key="gen_pdf"):
+                if df_today.empty:
+                    st.warning("Nenhuma daily registrada para esta data.")
+                else:
+                    pdf_bytes = generate_daily_pdf(df_today, sel_str)
+                    st.download_button(
+                        label="⬇️ Baixar PDF",
+                        data=pdf_bytes,
+                        file_name=f"daily_{sel_str.replace('/', '-')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="dl_pdf"
+                    )
 
         with col_btn:
             st.markdown("<br>", unsafe_allow_html=True)
