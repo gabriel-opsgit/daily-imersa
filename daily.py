@@ -125,31 +125,31 @@ DARK_CSS = """
     background: #1c1c1c;
     border: 1px solid #2a2a2a;
     border-radius: 10px;
-    padding: 18px 22px;
+    padding: 24px 28px;
     margin-bottom: 14px;
 }
 .daily-card-name {
-    font-size: 17px;
+    font-size: 22px;
     font-weight: 700;
     color: #e2e8f0;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
 }
 .daily-card-role {
-    font-size: 12px;
+    font-size: 15px;
     color: #888;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
 }
 .daily-section-label {
-    font-size: 11px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #666;
     margin-bottom: 4px;
 }
 .daily-section-value {
-    font-size: 14px;
+    font-size: 17px;
     color: #d4d4d4;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     white-space: pre-wrap;
 }
 .badge-ok   { background:#14532d; color:#4ade80; border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; }
@@ -301,8 +301,12 @@ def page_admin():
         if df_today.empty:
             st.info("Nenhuma daily registrada para esta data.")
         else:
-            for _, row in df_today.iterrows():
-                st.markdown(f"""
+            rows_list = list(df_today.iterrows())
+            for i in range(0, len(rows_list), 3):
+                cols = st.columns(3)
+                for j, (_, row) in enumerate(rows_list[i:i+3]):
+                    with cols[j]:
+                        st.markdown(f"""
 <div class="daily-card">
   <div class="daily-card-name">👤 {row['nome']}</div>
   <div class="daily-card-role">{row['funcao']} · {row.get('timestamp','')}</div>
