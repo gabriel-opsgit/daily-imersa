@@ -233,6 +233,18 @@ def page_admin():
 
     st.title("📊 Central de Dailies")
 
+    # Notificação de pendentes do dia
+    _df_daily_notif   = load_dailies()
+    _df_members_notif = load_members()
+    if not _df_members_notif.empty:
+        _today_str   = date.today().strftime("%d/%m/%Y")
+        _filled      = _df_daily_notif[_df_daily_notif["data"] == _today_str]["nome"].tolist() if not _df_daily_notif.empty else []
+        _missing     = [m for m in _df_members_notif["nome"].tolist() if m not in _filled]
+        if _missing:
+            st.warning(f"⏳ **{len(_missing)} pessoa(s) ainda não preencheram o daily de hoje:** {', '.join(_missing)}")
+        else:
+            st.success("✅ Todos preencheram o daily de hoje!")
+
     if st.sidebar.button("🔄 Atualizar dados"):
         load_dailies.clear()
         load_members.clear()
