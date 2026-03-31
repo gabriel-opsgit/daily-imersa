@@ -284,7 +284,6 @@ def page_form():
             row = df_members[df_members["nome"] == nome]
             if not row.empty:
                 funcao = row.iloc[0]["funcao"]
-        st.text_input("Função", value=funcao, disabled=True)
 
         st.divider()
 
