@@ -78,6 +78,15 @@ def remove_member(nome):
         ws.delete_rows(cell.row)
     load_members.clear()
 
+def delete_daily_row(timestamp: str, nome: str):
+    ws = get_daily_ws()
+    records = ws.get_all_records()
+    for i, row in enumerate(records, start=2):  # row 1 = header
+        if str(row.get("timestamp", "")) == timestamp and str(row.get("nome", "")) == nome:
+            ws.delete_rows(i)
+            break
+    load_dailies.clear()
+
 # ─── EMAIL ─────────────────────────────────────────────────────────────────────
 
 def send_reminder_emails(emails_missing: list, app_url: str):
@@ -307,6 +316,20 @@ def page_admin():
   <div class="daily-section-value">{row['dificuldades'] or '—'}</div>
 </div>
 """, unsafe_allow_html=True)
+
+            st.divider()
+            with st.expander("🗑️ Excluir registro de teste"):
+                opcoes = [
+                    f"{r['nome']} — {r.get('timestamp','')}"
+                    for _, r in df_today.iterrows()
+                ]
+                sel = st.selectbox("Selecione o registro", opcoes, key="del_sel")
+                if st.button("Excluir registro selecionado", type="secondary", key="del_btn"):
+                    idx = opcoes.index(sel)
+                    row_del = df_today.iloc[idx]
+                    delete_daily_row(str(row_del["timestamp"]), str(row_del["nome"]))
+                    st.success("Registro excluído.")
+                    st.rerun()
 
     # ── TAB 2: Histórico ───────────────────────────────────────────────────────
     with tab2:
