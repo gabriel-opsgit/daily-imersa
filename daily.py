@@ -126,53 +126,94 @@ def send_reminder_emails(emails_missing: list, app_url: str):
 def generate_daily_pdf(df: pd.DataFrame, data_str: str) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=2*cm, rightMargin=2*cm,
+                            leftMargin=2.2*cm, rightMargin=2.2*cm,
                             topMargin=2*cm, bottomMargin=2*cm)
 
     base = getSampleStyleSheet()
+
     title_style = ParagraphStyle("title", parent=base["Heading1"],
-                                 fontSize=20, textColor=colors.HexColor("#1a1a2e"),
-                                 alignment=TA_CENTER, spaceAfter=4)
+                                 fontSize=22, textColor=colors.HexColor("#1a1a2e"),
+                                 alignment=TA_CENTER, spaceAfter=2, fontName="Helvetica-Bold")
     sub_style   = ParagraphStyle("sub", parent=base["Normal"],
-                                 fontSize=11, textColor=colors.HexColor("#555555"),
-                                 alignment=TA_CENTER, spaceAfter=16)
-    name_style  = ParagraphStyle("name", parent=base["Heading2"],
-                                 fontSize=14, textColor=colors.HexColor("#1a1a2e"),
-                                 spaceBefore=8, spaceAfter=2)
+                                 fontSize=11, textColor=colors.HexColor("#666666"),
+                                 alignment=TA_CENTER, spaceAfter=20)
+    name_style  = ParagraphStyle("name", parent=base["Normal"],
+                                 fontSize=15, textColor=colors.white,
+                                 fontName="Helvetica-Bold", spaceAfter=0, leading=20)
     role_style  = ParagraphStyle("role", parent=base["Normal"],
-                                 fontSize=10, textColor=colors.HexColor("#888888"),
-                                 spaceAfter=8)
-    label_style = ParagraphStyle("label", parent=base["Normal"],
-                                 fontSize=9, textColor=colors.HexColor("#666666"),
-                                 fontName="Helvetica-Bold", spaceAfter=2,
-                                 spaceBefore=6)
-    value_style = ParagraphStyle("value", parent=base["Normal"],
-                                 fontSize=11, textColor=colors.HexColor("#222222"),
-                                 spaceAfter=4, leading=15)
+                                 fontSize=10, textColor=colors.HexColor("#ccddff"),
+                                 spaceAfter=0)
+    narrative_style = ParagraphStyle("narrative", parent=base["Normal"],
+                                     fontSize=12, textColor=colors.HexColor("#222222"),
+                                     leading=19, spaceAfter=0)
+
+    # accent colors cycling per person
+    accent_colors = [
+        colors.HexColor("#2d4a8a"),
+        colors.HexColor("#1d6b52"),
+        colors.HexColor("#7a2d6e"),
+        colors.HexColor("#8a4a1a"),
+        colors.HexColor("#1a5f7a"),
+        colors.HexColor("#5a2d82"),
+    ]
 
     story = []
-    story.append(Paragraph("📋 Relatório Daily Imersa", title_style))
-    story.append(Paragraph(f"Data: {data_str}", sub_style))
-    story.append(HRFlowable(width="100%", thickness=1,
-                            color=colors.HexColor("#dddddd"), spaceAfter=16))
+    story.append(Paragraph("Relatório Daily — Imersa", title_style))
+    story.append(Paragraph(data_str, sub_style))
+    story.append(HRFlowable(width="100%", thickness=1.5,
+                            color=colors.HexColor("#2d4a8a"), spaceAfter=20))
 
-    for _, row in df.iterrows():
-        story.append(Paragraph(f"👤 {row['nome']}", name_style))
-        story.append(Paragraph(f"{row.get('funcao','') or ''} · {row.get('timestamp','') or ''}", role_style))
+    for i, (_, row) in enumerate(df.iterrows()):
+        nome       = str(row.get("nome", "") or "").strip()
+        funcao     = str(row.get("funcao", "") or "").strip()
+        feito      = str(row.get("feito_hoje", "") or "").strip() or "não informou"
+        amanha     = str(row.get("amanha", "") or "").strip() or "não informou"
+        bloqueios  = str(row.get("bloqueios", "") or "").strip() or "nenhum"
+        dific      = str(row.get("dificuldades", "") or "").strip() or "nenhuma"
 
-        for label, field in [
-            ("✅ O que fez hoje", "feito_hoje"),
-            ("📅 Para amanhã",   "amanha"),
-            ("🚧 Bloqueios",     "bloqueios"),
-            ("⚠️ Dificuldades",  "dificuldades"),
-        ]:
-            valor = str(row.get(field, "") or "").strip() or "—"
-            story.append(Paragraph(label, label_style))
-            story.append(Paragraph(valor.replace("\n", "<br/>"), value_style))
+        accent = accent_colors[i % len(accent_colors)]
 
-        story.append(HRFlowable(width="100%", thickness=0.5,
-                                color=colors.HexColor("#eeeeee"),
-                                spaceBefore=12, spaceAfter=4))
+        # Header colorido
+        header_data = [[
+            Paragraph(nome, name_style),
+            Paragraph(funcao, role_style),
+        ]]
+        header_table = Table(header_data, colWidths=["60%", "40%"])
+        header_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), accent),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("ROUNDEDCORNERS", [6]),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.append(header_table)
+
+        # Texto narrativo
+        narrative = (
+            f"<b>{nome}</b> {feito.replace(chr(10), ' ')}. "
+            f"Para amanhã, pretende: {amanha.replace(chr(10), ' ')}. "
+        )
+        if bloqueios.lower() not in ("nenhum", "—", "-", ""):
+            narrative += f"Ficou bloqueado(a) em: {bloqueios.replace(chr(10), ' ')}. "
+        if dific.lower() not in ("nenhuma", "—", "-", ""):
+            narrative += f"Relatou dificuldades: {dific.replace(chr(10), ' ')}."
+
+        # Caixa de texto com borda lateral colorida
+        narrative_data = [[Paragraph(narrative, narrative_style)]]
+        narrative_table = Table(narrative_data, colWidths=["100%"])
+        narrative_table.setStyle(TableStyle([
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("TOPPADDING",    (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#f7f9ff")),
+            ("LINEAFTER",     (0, 0), (0, -1), 0, colors.white),
+            ("LINEBEFORE",    (0, 0), (0, -1), 4, accent),
+        ]))
+        story.append(narrative_table)
+        story.append(Spacer(1, 16))
 
     doc.build(story)
     return buf.getvalue()
@@ -340,19 +381,18 @@ def page_admin():
 
         with col_pdf:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📄 Gerar PDF", use_container_width=True, key="gen_pdf"):
-                if df_today.empty:
-                    st.warning("Nenhuma daily registrada para esta data.")
-                else:
-                    pdf_bytes = generate_daily_pdf(df_today, sel_str)
-                    st.download_button(
-                        label="⬇️ Baixar PDF",
-                        data=pdf_bytes,
-                        file_name=f"daily_{sel_str.replace('/', '-')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key="dl_pdf"
-                    )
+            if not df_today.empty:
+                pdf_bytes = generate_daily_pdf(df_today, sel_str)
+                st.download_button(
+                    label="📄 Baixar PDF",
+                    data=pdf_bytes,
+                    file_name=f"daily_{sel_str.replace('/', '-')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="dl_pdf"
+                )
+            else:
+                st.button("📄 Baixar PDF", disabled=True, use_container_width=True, key="dl_pdf_dis")
 
         with col_btn:
             st.markdown("<br>", unsafe_allow_html=True)
