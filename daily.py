@@ -3,6 +3,15 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
+
+BRT = ZoneInfo("America/Sao_Paulo")
+
+def today_brt() -> date:
+    return datetime.now(BRT).date()
+
+def now_brt() -> datetime:
+    return datetime.now(BRT)
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -68,8 +77,8 @@ def load_members():
 
 def submit_daily(nome, funcao, feito_hoje, bloqueios, dificuldades, amanha):
     get_daily_ws().append_row([
-        datetime.now().strftime("%d/%m/%Y %H:%M"),
-        date.today().strftime("%d/%m/%Y"),
+        now_brt().strftime("%d/%m/%Y %H:%M"),
+        today_brt().strftime("%d/%m/%Y"),
         nome, funcao, feito_hoje, bloqueios, dificuldades, amanha
     ])
     load_dailies.clear()
@@ -267,7 +276,7 @@ DARK_CSS = """
 def page_form():
     st.markdown(DARK_CSS, unsafe_allow_html=True)
     st.title("📋 Daily Imersa")
-    st.caption(f"Hoje é {date.today().strftime('%d/%m/%Y')}")
+    st.caption(f"Hoje é {today_brt().strftime('%d/%m/%Y')}")
 
     df_members = load_members()
     if df_members.empty:
@@ -301,7 +310,7 @@ def page_form():
             st.error("Preencha o campo 'O que você fez hoje'.")
         else:
             df_daily = load_dailies()
-            today_str = date.today().strftime("%d/%m/%Y")
+            today_str = today_brt().strftime("%d/%m/%Y")
             ja_preencheu = (
                 not df_daily.empty and
                 not df_daily[(df_daily["nome"] == nome) & (df_daily["data"] == today_str)].empty
@@ -341,7 +350,7 @@ def page_admin():
     _df_daily_notif   = load_dailies()
     _df_members_notif = load_members()
     if not _df_members_notif.empty:
-        _today_str   = date.today().strftime("%d/%m/%Y")
+        _today_str   = today_brt().strftime("%d/%m/%Y")
         _filled      = _df_daily_notif[_df_daily_notif["data"] == _today_str]["nome"].tolist() if not _df_daily_notif.empty else []
         _missing     = [m for m in _df_members_notif["nome"].tolist() if m not in _filled]
         if _missing:
@@ -367,7 +376,7 @@ def page_admin():
     with tab1:
         col_date, col_btn, col_pdf = st.columns([2, 1, 1])
         with col_date:
-            sel_date = st.date_input("Data", value=date.today(), key="sel_date")
+            sel_date = st.date_input("Data", value=today_brt(), key="sel_date")
         sel_str = sel_date.strftime("%d/%m/%Y")
 
         df_today = (
@@ -474,7 +483,7 @@ def page_admin():
             filtro_nome = st.selectbox("Pessoa", nomes_opts, key="hist_nome")
         with c2:
             meses = ["Todos"] + [
-                f"{m:02d}/{datetime.now().year}" for m in range(1, 13)
+                f"{m:02d}/{now_brt().year}" for m in range(1, 13)
             ]
             filtro_mes = st.selectbox("Mês", meses, key="hist_mes")
         with c3:
@@ -498,11 +507,11 @@ def page_admin():
                 ]
 
             if filtro_semana == "Esta semana":
-                hoje = date.today()
+                hoje = today_brt()
                 inicio = hoje - timedelta(days=hoje.weekday())
                 df_hist = df_hist[df_hist["data_dt"].dt.date >= inicio]
             elif filtro_semana == "Semana passada":
-                hoje   = date.today()
+                hoje   = today_brt()
                 inicio = hoje - timedelta(days=hoje.weekday() + 7)
                 fim    = inicio + timedelta(days=6)
                 df_hist = df_hist[
