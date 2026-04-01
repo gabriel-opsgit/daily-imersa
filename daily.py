@@ -19,7 +19,7 @@ import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 
@@ -197,8 +197,6 @@ def generate_daily_pdf(df: pd.DataFrame, data_str: str) -> bytes:
             ("ROUNDEDCORNERS", [6]),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]))
-        story.append(header_table)
-
         # Texto narrativo
         narrative = (
             f"<b>{nome}</b> {feito.replace(chr(10), ' ')}. "
@@ -221,7 +219,9 @@ def generate_daily_pdf(df: pd.DataFrame, data_str: str) -> bytes:
             ("LINEAFTER",     (0, 0), (0, -1), 0, colors.white),
             ("LINEBEFORE",    (0, 0), (0, -1), 4, accent),
         ]))
-        story.append(narrative_table)
+
+        # Mantém header + texto juntos na mesma página
+        story.append(KeepTogether([header_table, narrative_table]))
         story.append(Spacer(1, 16))
 
     doc.build(story)
